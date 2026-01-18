@@ -24,7 +24,6 @@ import { DocumentsModule } from './components/DocumentsModule.tsx';
 import { ActivityLogModule } from './components/ActivityLogModule.tsx';
 import { LoginScreen } from './components/LoginScreen.tsx';
 import { RequireAuth } from './components/RequireAuth.tsx';
-import { FirstRunSetup } from './components/FirstRunSetup.tsx';
 import { SystemView } from './types.ts';
 import { cloudService } from './services/cloudService.ts';
 import { supabase } from './services/supabaseClient';
@@ -37,16 +36,7 @@ const MainApp: React.FC = () => {
   const { currentUser } = useAuth();
   const [currentView, setCurrentView] = useState<SystemView>('dashboard');
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
-  const [firstRun, setFirstRun] = useState<boolean | null>(null);
 
-  // Check if any users exist (for FirstRunSetup)
-  useEffect(() => {
-    (async () => {
-      const { data, error } = await supabase.from('app_users').select('id').limit(1);
-      if (!data || data.length === 0) setFirstRun(true);
-      else setFirstRun(false);
-    })();
-  }, []);
 
   // --- Auto Sync Logic ---
   useEffect(() => {
@@ -100,9 +90,7 @@ const MainApp: React.FC = () => {
     testSupabase();
   }, []);
 
-  if (firstRun) {
-    return <FirstRunSetup />;
-  }
+
   return (
     <RequireAuth>
       <div className="flex w-full h-screen overflow-hidden bg-gray-100 print:h-auto print:overflow-visible">
