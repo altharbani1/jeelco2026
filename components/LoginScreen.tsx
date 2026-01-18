@@ -26,13 +26,20 @@ export const LoginScreen: React.FC = () => {
     setError('');
     setStatusText('جاري التحقق من البيانات...');
     try {
-        const success = await signIn(username.trim(), password.trim());
-        if (!success) {
+        const result = await signIn(username.trim(), password.trim());
+        // طباعة نتيجة تسجيل الدخول في console
+        // ملاحظة: signIn يجب أن يرجع كائن فيه data و error
+        // إذا signIn يرجع فقط true/false، عدل الدالة لاحقاً
+        // هنا سنطبع فقط ما هو متاح
+        // مثال: { hasSession: !!data.session, hasUser: !!data.user, error: error?.message }
+        // لكن حالياً سنطبع النتيجة كما هي
+        console.log('LOGIN_RESULT', result);
+        if (!result || (typeof result === 'object' && result.error)) {
             setStatusText('بيانات الدخول غير صحيحة أو المستخدم غير موجود.');
-            setError('اسم المستخدم أو كلمة المرور غير صحيحة.');
+            setError(result && result.error ? result.error : 'اسم المستخدم أو كلمة المرور غير صحيحة.');
         }
-    } catch (e) {
-        setError('حدث خطأ أثناء محاولة الاتصال بـ Supabase.');
+    } catch (e: any) {
+        setError(e?.message || 'حدث خطأ أثناء محاولة الاتصال بـ Supabase.');
     }
   };
 

@@ -11,7 +11,10 @@ interface SupabaseUser {
 interface SupabaseAuthContextType {
   user: SupabaseUser | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<boolean>;
+  loadingAuth: boolean;
+  loadingProfile: boolean;
+  error: string | null;
+  signIn: (email: string, password: string) => Promise<any>;
   signOut: () => Promise<void>;
 }
 
@@ -20,6 +23,9 @@ const SupabaseAuthContext = createContext<SupabaseAuthContextType | undefined>(u
 export const SupabaseAuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingAuth, setLoadingAuth] = useState(false);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const session = supabase.auth.getSession();
@@ -41,17 +47,53 @@ export const SupabaseAuthProvider: React.FC<{ children: ReactNode }> = ({ childr
   }, []);
 
   const fetchAppUser = async (id: string) => {
-    const { data, error } = await supabase.from('app_users').select('*').eq('id', id).single();
-    if (data) {
+    setLoadingProfile(true);
+    setError(null);
+    let timeoutId: any;
+    try {
+      // Timeout بعد 8 ثواني
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('تعذر تحميل بيانات المستخدم. تحقق من الاتصال أو السياسات (RLS).')), 8000);
+      });
+      const userPromise = supabase.from('app_users').select('id, email, company_id, role').eq('id', id).single();
+      const { data, error } = await Promise.race([userPromise, timeoutPromise]) as any;
+      clearTimeout(timeoutId);
+      if (error && error.code === 'PGRST116') { // Not found
+        // جلب أول شركة أو إنشاء واحدة افتراضية
+        let companyId = null;
+        const { data: companies } = await supabase.from('companies').select('id').limit(1);
+        if (companies && companies.length > 0) companyId = companies[0].id;
+        else {
+          const { data: newCompany } = await supabase.from('companies').insert({ name: 'Jeelco' }).select().single();
+          companyId = newCompany?.id;
+        }
+        // تحقق هل هو أول مستخدم
+        const { count } = await supabase.from('app_users').select('id', { count: 'exact', head: true });
+        const role = (count === 0) ? 'admin' : 'staff';
+        // upsert صف المستخدم
+        await supabase.from('app_users').upsert({
+          id,
+          email: '',
+          company_id: companyId,
+          role
+        });
+        // أعد جلبه
+        return await fetchAppUser(id);
+      }
+      if (error) throw error;
+      if (!data) throw new Error('تعذر تحميل بيانات المستخدم.');
       setUser({
         id: data.id,
         email: data.email,
         company_id: data.company_id,
-        role: await fetchUserRole(id, data.company_id)
+        role: data.role || (await fetchUserRole(id, data.company_id))
       });
-    } else {
+      setError(null);
+    } catch (err: any) {
       setUser(null);
+      setError(err.message || 'تعذر تحميل بيانات المستخدم.');
     }
+    setLoadingProfile(false);
   };
 
   const fetchUserRole = async (userId: string, companyId: string) => {
@@ -67,15 +109,17 @@ export const SupabaseAuthProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   const signIn = async (email: string, password: string) => {
-    setLoading(true);
+    setLoadingAuth(true);
+    setError(null);
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    let result = { hasSession: !!data?.session, hasUser: !!data?.user, error: error?.message };
     if (data?.user) {
       await fetchAppUser(data.user.id);
-      setLoading(false);
-      return true;
+      setLoadingAuth(false);
+      return result;
     }
-    setLoading(false);
-    return false;
+    setLoadingAuth(false);
+    return result;
   };
 
   const signOut = async () => {
@@ -84,7 +128,7 @@ export const SupabaseAuthProvider: React.FC<{ children: ReactNode }> = ({ childr
   };
 
   return (
-    <SupabaseAuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <SupabaseAuthContext.Provider value={{ user, loading, loadingAuth, loadingProfile, error, signIn, signOut }}>
       {children}
     </SupabaseAuthContext.Provider>
   );
