@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
 import { Plus, Trash2, Printer, Sparkles, Save, Database, User, ClipboardList, DollarSign, FileText, Star, ShieldCheck, Scale, Users, ImageIcon, Image as ImageIconLucide, ChevronDown } from 'lucide-react';
 import { QuoteItem, QuoteDetails, CompanyConfig, TechnicalSpecs, SpecsDatabase, SupplierProduct, Customer } from '../types.ts';
 import { generateTechnicalDescription } from '../services/geminiService.ts';
@@ -35,9 +36,25 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
-  items, setItems, details, setDetails, techSpecs, setTechSpecs, config, setConfig, onPrint, onSave
+    items, setItems, details, setDetails, techSpecs, setTechSpecs, config, setConfig, onPrint, onSave
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'specs' | 'items' | 'features' | 'obligations' | 'handover' | 'terms' | 'gallery'>('details');
+    const { user } = useSupabaseAuth();
+    const [activeTab, setActiveTab] = useState<'details' | 'specs' | 'items' | 'features' | 'obligations' | 'handover' | 'terms' | 'gallery'>('details');
+
+    // صلاحيات الموديولات حسب الدور
+    const role = user?.role;
+    const allowedModules = {
+        admin: [
+            'dashboard', 'customers', 'quotes', 'contracts', 'projects', 'invoices', 'receipts', 'expenses', 'purchases', 'claims', 'hr', 'documents', 'forms', 'users', 'warranties', 'smart_elevator', 'calculator', 'company_profile', 'specs_manager', 'activity_log'
+        ],
+        manager: [
+            'dashboard', 'customers', 'quotes', 'contracts', 'projects', 'invoices', 'receipts', 'expenses', 'purchases', 'claims', 'hr', 'documents', 'forms', 'warranties', 'smart_elevator', 'calculator', 'company_profile', 'specs_manager', 'activity_log'
+        ],
+        staff: [
+            'dashboard', 'customers', 'quotes', 'contracts', 'projects', 'invoices', 'receipts', 'expenses', 'purchases', 'claims', 'hr', 'documents', 'forms', 'warranties', 'smart_elevator', 'calculator', 'company_profile', 'specs_manager', 'activity_log'
+        ]
+    };
+    // استخدم allowedModules[role] لتصفية الموديولات
   const [specsDb, setSpecsDb] = useState<SpecsDatabase>(DEFAULT_SPECS_DB);
   const [productsDb, setProductsDb] = useState<SupplierProduct[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);

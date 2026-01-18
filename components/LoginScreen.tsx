@@ -1,16 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext.tsx';
+import { useSupabaseAuth } from '../contexts/SupabaseAuthContext';
 import { LogIn, Lock, User as UserIcon, AlertCircle, CloudDownload, Settings, Database, CheckCircle2, XCircle } from 'lucide-react';
 import { cloudService } from '../services/cloudService.ts';
 
 export const LoginScreen: React.FC = () => {
-  const { login } = useAuth();
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState('جاري التحقق...');
+        const { signIn, loading } = useSupabaseAuth();
+        const [username, setUsername] = useState('');
+        const [password, setPassword] = useState('');
+        const [error, setError] = useState('');
+        const [statusText, setStatusText] = useState('جاري التحقق...');
   
   // DB Config State
   const [showConfig, setShowConfig] = useState(false);
@@ -24,21 +23,16 @@ export const LoginScreen: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
     setStatusText('جاري التحقق من البيانات...');
-    
     try {
-        const success = await login(username.trim(), password.trim());
+        const success = await signIn(username.trim(), password.trim());
         if (!success) {
-            setStatusText('لم يتم العثور محلياً، جاري البحث في السحابة...');
-            await new Promise(r => setTimeout(r, 800));
-            setError('اسم المستخدم أو كلمة المرور غير صحيحة، أو لم يتم ضبط اتصال السحابة.');
-            setLoading(false);
+            setStatusText('بيانات الدخول غير صحيحة أو المستخدم غير موجود.');
+            setError('اسم المستخدم أو كلمة المرور غير صحيحة.');
         }
     } catch (e) {
-        setError('حدث خطأ أثناء محاولة الاتصال بالسحابة. تأكد من إعدادات الرابط.');
-        setLoading(false);
+        setError('حدث خطأ أثناء محاولة الاتصال بـ Supabase.');
     }
   };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
 import { LanguageProvider } from './contexts/LanguageContext.tsx';
@@ -26,6 +25,8 @@ import { ActivityLogModule } from './components/ActivityLogModule.tsx';
 import { LoginScreen } from './components/LoginScreen.tsx';
 import { SystemView } from './types.ts';
 import { cloudService } from './services/cloudService.ts';
+import { supabase } from './services/supabaseClient';
+import { testConnection } from './lib/supabase';
 
 // Default Connection String (Auto-injected)
 const DEFAULT_NEON_CONN = 'postgresql://neondb_owner:npg_daR6gtonfr7V@ep-blue-butterfly-aebejil8-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require';
@@ -70,6 +71,22 @@ const MainApp: React.FC = () => {
 
     return () => clearInterval(syncInterval);
   }, [currentUser]);
+
+  // Test Supabase connection
+  useEffect(() => {
+    // اختبار الاتصال بقاعدة Supabase
+    testConnection();
+
+    async function testSupabase() {
+      const { data, error } = await supabase.from('test_table').select('*').limit(1);
+      if (error) {
+        console.error('Supabase connection error:', error.message);
+      } else {
+        console.log('Supabase connection success:', data);
+      }
+    }
+    testSupabase();
+  }, []);
 
   if (!currentUser) {
       return <LoginScreen />;
