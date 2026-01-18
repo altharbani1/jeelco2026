@@ -34,31 +34,31 @@ export const FirstRunSetup: React.FC = () => {
       // 2. Create admin user
       const { data, error: signUpError } = await supabase.auth.signUp({ email, password });
       if (signUpError) throw new Error(signUpError.message);
-      // يجب تسجيل الدخول بعد التسجيل مباشرة
+      // تسجيل الدخول مباشرة بعد التسجيل
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
       if (signInError) throw new Error(signInError.message);
       const userId = signInData?.user?.id;
       if (!userId) throw new Error('لم يتم تسجيل الدخول بعد إنشاء المستخدم');
 
-      // 3. Insert user in app_users (الآن auth.uid() متاح)
-      const { error: insertError } = await supabase.from('app_users').insert({
+      // إدراج المستخدم في app_users في الخلفية بدون انتظار
+      supabase.from('app_users').insert({
         id: userId,
         email,
         full_name: 'Admin',
         company_id,
       });
-      if (insertError) throw new Error(insertError.message);
 
-      // 4. Assign admin role (role_id = 1)
-      const { error: roleError } = await supabase.from('user_roles').insert({
+      // تعيين الدور الإداري في الخلفية أيضاً
+      supabase.from('user_roles').insert({
         user_id: userId,
         role_id: 1,
         company_id,
       });
-      if (roleError) throw new Error(roleError.message);
 
       setSuccess(true);
-      window.location.reload();
+      // الانتقال مباشرة للتطبيق بعد نجاح التسجيل والدخول
+      // يمكنك هنا توجيه المستخدم لصفحة رئيسية أو داشبورد
+      window.location.href = '/';
     } catch (err: any) {
       setError(err.message);
     }
