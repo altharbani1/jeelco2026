@@ -23,7 +23,7 @@ import { FormsModule } from './components/FormsModule.tsx';
 import { DocumentsModule } from './components/DocumentsModule.tsx';
 import { ActivityLogModule } from './components/ActivityLogModule.tsx';
 import { LoginScreen } from './components/LoginScreen.tsx';
-import { RequireAuth } from './components/RequireAuth.tsx';
+
 import { SystemView } from './types.ts';
 import { cloudService } from './services/cloudService.ts';
 
@@ -61,34 +61,37 @@ const MainApp: React.FC = () => {
   }, [currentUser]);
 
 
+
+  if (!currentUser) {
+    return <LoginScreen />;
+  }
+
   return (
-    <RequireAuth>
-      <div className="flex w-full h-screen overflow-hidden bg-gray-100 print:h-auto print:overflow-visible">
-        <SystemNav currentView={currentView} setView={setCurrentView} syncStatus={syncStatus} />
-        <main className="flex-1 relative flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
-          {currentView === 'dashboard' && <Dashboard setView={setCurrentView} />}
-          {currentView === 'users' && <UserManagementModule />}
-          {currentView === 'activity_log' && <ActivityLogModule />}
-          {currentView === 'company_profile' && <CompanyProfileModule />}
-          {currentView === 'specs_manager' && <SpecsManagerModule />}
-          {currentView === 'customers' && <CustomerModule />}
-          {currentView === 'calculator' && <CostCalculatorModule />}
-          {currentView === 'quotes' && <QuoteModule />}
-          {currentView === 'invoices' && <InvoiceModule />}
-          {currentView === 'claims' && <FinancialClaimModule />}
-          {currentView === 'receipts' && <ReceiptModule />}
-          {currentView === 'expenses' && <ExpenseModule />}
-          {currentView === 'contracts' && <ContractModule />}
-          {currentView === 'projects' && <ProjectModule />}
-          {currentView === 'purchases' && <PurchaseModule />}
-          {currentView === 'warranties' && <WarrantyModule />}
-          {currentView === 'hr' && <HRModule />}
-          {currentView === 'smart_elevator' && <SmartElevatorModule />}
-          {currentView === 'forms' && <FormsModule />}
-          {currentView === 'documents' && <DocumentsModule />}
-        </main>
-      </div>
-    </RequireAuth>
+    <div className="flex w-full h-screen overflow-hidden bg-gray-100 print:h-auto print:overflow-visible">
+      <SystemNav currentView={currentView} setView={setCurrentView} syncStatus={syncStatus} />
+      <main className="flex-1 relative flex flex-col h-screen overflow-hidden print:h-auto print:overflow-visible">
+        {currentView === 'dashboard' && <Dashboard setView={setCurrentView} />}
+        {currentView === 'users' && <UserManagementModule />}
+        {currentView === 'activity_log' && <ActivityLogModule />}
+        {currentView === 'company_profile' && <CompanyProfileModule />}
+        {currentView === 'specs_manager' && <SpecsManagerModule />}
+        {currentView === 'customers' && <CustomerModule />}
+        {currentView === 'calculator' && <CostCalculatorModule />}
+        {currentView === 'quotes' && <QuoteModule />}
+        {currentView === 'invoices' && <InvoiceModule />}
+        {currentView === 'claims' && <FinancialClaimModule />}
+        {currentView === 'receipts' && <ReceiptModule />}
+        {currentView === 'expenses' && <ExpenseModule />}
+        {currentView === 'contracts' && <ContractModule />}
+        {currentView === 'projects' && <ProjectModule />}
+        {currentView === 'purchases' && <PurchaseModule />}
+        {currentView === 'warranties' && <WarrantyModule />}
+        {currentView === 'hr' && <HRModule />}
+        {currentView === 'smart_elevator' && <SmartElevatorModule />}
+        {currentView === 'forms' && <FormsModule />}
+        {currentView === 'documents' && <DocumentsModule />}
+      </main>
+    </div>
   );
 };
 
