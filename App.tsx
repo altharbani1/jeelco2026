@@ -34,11 +34,35 @@ const MainApp: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
 
 
+  // --- Auto Restore on First Load ---
+  useEffect(() => {
+    const localData = cloudService.getLocalData();
+    const isEmpty = Object.keys(localData).length === 0;
+
+    if (isEmpty) {
+      // الجهاز جديد أو فارغ — سحب البيانات من Supabase
+      setSyncStatus('syncing');
+      cloudService.downloadData().then((remoteData) => {
+        if (remoteData && typeof remoteData === 'object') {
+          Object.entries(remoteData).forEach(([key, value]) => {
+            if (typeof value === 'string') {
+              localStorage.setItem(key, value);
+            }
+          });
+          setSyncStatus('synced');
+          setTimeout(() => {
+            setSyncStatus('idle');
+            window.location.reload(); // إعادة تحميل لتطبيق البيانات
+          }, 1000);
+        } else {
+          setSyncStatus('idle');
+        }
+      }).catch(() => setSyncStatus('error'));
+    }
+  }, []);
+
   // --- Auto Sync Logic (Supabase) ---
   useEffect(() => {
-    // تهيئة قاعدة البيانات
-    cloudService.initDb().catch(console.error);
-
     // Background Sync Loop كل 30 ثانية
     const syncInterval = setInterval(async () => {
       if (!currentUser) return;
@@ -59,6 +83,7 @@ const MainApp: React.FC = () => {
 
     return () => clearInterval(syncInterval);
   }, [currentUser]);
+
 
 
 
