@@ -40,20 +40,15 @@ const MainApp: React.FC = () => {
     const isEmpty = Object.keys(localData).length === 0;
 
     if (isEmpty) {
-      // الجهاز جديد أو فارغ — سحب البيانات من Supabase
       setSyncStatus('syncing');
-      cloudService.downloadData().then((remoteData) => {
+      // محاولة استرجاع من نسخة جهاز افتراضية أولاً
+      cloudService.downloadData('default').then((remoteData) => {
         if (remoteData && typeof remoteData === 'object') {
           Object.entries(remoteData).forEach(([key, value]) => {
-            if (typeof value === 'string') {
-              localStorage.setItem(key, value);
-            }
+            if (typeof value === 'string') localStorage.setItem(key, value);
           });
           setSyncStatus('synced');
-          setTimeout(() => {
-            setSyncStatus('idle');
-            window.location.reload(); // إعادة تحميل لتطبيق البيانات
-          }, 1000);
+          setTimeout(() => { setSyncStatus('idle'); window.location.reload(); }, 1000);
         } else {
           setSyncStatus('idle');
         }
@@ -61,17 +56,15 @@ const MainApp: React.FC = () => {
     }
   }, []);
 
-  // --- Auto Sync Logic (Supabase) ---
+  // --- Auto Sync (كل 30 ثانية، مخصص لكل مستخدم) ---
   useEffect(() => {
-    // Background Sync Loop كل 30 ثانية
     const syncInterval = setInterval(async () => {
       if (!currentUser) return;
-
       try {
         const currentData = cloudService.getLocalData();
         if (Object.keys(currentData).length > 0) {
           setSyncStatus('syncing');
-          await cloudService.uploadData(currentData);
+          await cloudService.uploadData(currentData, currentUser.username);
           setSyncStatus('synced');
           setTimeout(() => setSyncStatus('idle'), 2000);
         }
@@ -80,7 +73,6 @@ const MainApp: React.FC = () => {
         setSyncStatus('error');
       }
     }, 30000);
-
     return () => clearInterval(syncInterval);
   }, [currentUser]);
 
