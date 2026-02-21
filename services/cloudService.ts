@@ -1,5 +1,10 @@
 
-import { neon } from '@neondatabase/serverless';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 // القائمة الشاملة لجميع مفاتيح التخزين في النظام
 const STORAGE_KEYS = [
@@ -28,111 +33,102 @@ const STORAGE_KEYS = [
 ];
 
 export const cloudService = {
-  // 1. اختبار الاتصال مع تهيئة تلقائية
-  async testConnection(connString: string) {
-    if (!connString || !connString.startsWith('postgres')) return false;
+  // 1. اختبار الاتصال
+  async testConnection() {
     try {
-      const sql = neon(connString);
-      const result = await sql`SELECT 1 as result`;
-      return result && result[0]?.result === 1;
+      const { error } = await supabase.from('jilco_backups').select('key').limit(1);
+      return !error;
     } catch (e) {
-      console.error("Cloud Connection Error:", e);
+      console.error('Cloud Connection Error:', e);
       return false;
     }
   },
 
-  // 2. تهيئة قاعدة البيانات وضمان وجود الجدول
-  async initDb(connString: string) {
-    if (!connString) return false;
-    try {
-        const sql = neon(connString);
-        await sql`CREATE TABLE IF NOT EXISTS jilco_backups (
-          id SERIAL PRIMARY KEY,
-          key TEXT UNIQUE NOT NULL,
-          data JSONB NOT NULL,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        )`;
-        return true;
-    } catch (e) {
-        console.error("Init DB Error:", e);
-        return false;
-    }
+  // 2. تهيئة قاعدة البيانات (الجدول يُنشأ عبر Supabase SQL Editor)
+  async initDb() {
+    // الجدول يُنشأ مسبقاً في Supabase Dashboard
+    // لا حاجة لـ CREATE TABLE من الكود
+    return true;
   },
 
   // 3. جمع البيانات المحلية
   getLocalData() {
     const data: Record<string, any> = {};
     STORAGE_KEYS.forEach(key => {
-        const val = localStorage.getItem(key);
-        if(val) data[key] = val; 
+      const val = localStorage.getItem(key);
+      if (val) data[key] = val;
     });
     return data;
   },
 
-  // 4. رفع البيانات (Backup) مع فحص الحجم
-  async uploadData(connString: string, data: any) {
-    if (!connString) return false;
+  // 4. رفع البيانات (Backup)
+  async uploadData(data: any) {
     try {
-        const sql = neon(connString);
-        const jsonData = JSON.stringify(data);
-        
-        // فحص حجم البيانات (Postgres JSONB limit is usually high, but network request might fail)
-        if (jsonData.length > 10 * 1024 * 1024) { // 10MB limit check
-            console.warn("Payload too large for a single sync, consider removing some documents.");
-        }
+      const jsonData = JSON.stringify(data);
 
-        await sql`
-          INSERT INTO jilco_backups (key, data, updated_at)
-          VALUES ('latest_backup', ${jsonData}::jsonb, NOW())
-          ON CONFLICT (key) 
-          DO UPDATE SET data = ${jsonData}::jsonb, updated_at = NOW()
-        `;
-        return true;
+      if (jsonData.length > 10 * 1024 * 1024) {
+        console.warn('Payload too large for a single sync, consider removing some documents.');
+      }
+
+      const { error } = await supabase
+        .from('jilco_backups')
+        .upsert(
+          { key: 'latest_backup', data: jsonData, updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        );
+
+      if (error) throw error;
+      return true;
     } catch (e) {
-        console.error("Upload Data Error:", e);
-        throw e; // Pass error to UI for syncStatus
+      console.error('Upload Data Error:', e);
+      throw e;
     }
   },
 
   // 5. استرجاع البيانات (Restore)
-  async downloadData(connString: string) {
-    if (!connString) return null;
+  async downloadData() {
     try {
-        const sql = neon(connString);
-        const result = await sql`SELECT data FROM jilco_backups WHERE key = 'latest_backup'`;
-        if (result && result.length > 0) {
-            return result[0].data;
-        }
-        return null;
+      const { data, error } = await supabase
+        .from('jilco_backups')
+        .select('data')
+        .eq('key', 'latest_backup')
+        .single();
+
+      if (error || !data) return null;
+
+      // data.data هو نص JSON أو كائن مباشر
+      if (typeof data.data === 'string') {
+        return JSON.parse(data.data);
+      }
+      return data.data;
     } catch (e) {
-        console.error("Download Data Error:", e);
-        return null;
+      console.error('Download Data Error:', e);
+      return null;
     }
   },
 
   // 6. التحقق من حالة النسخة الاحتياطية
-  async getBackupInfo(connString: string) {
-    if (!connString) return { exists: false };
+  async getBackupInfo() {
     try {
-      const sql = neon(connString);
-      const result = await sql`
-        SELECT 
-          updated_at, 
-          pg_column_size(data) as size_bytes 
-        FROM jilco_backups 
-        WHERE key = 'latest_backup'
-      `;
-      
-      if (result && result.length > 0) {
-        return {
-          exists: true,
-          updatedAt: result[0].updated_at,
-          sizeBytes: result[0].size_bytes
-        };
-      }
-      return { exists: false };
+      const { data, error } = await supabase
+        .from('jilco_backups')
+        .select('updated_at, data')
+        .eq('key', 'latest_backup')
+        .single();
+
+      if (error || !data) return { exists: false };
+
+      const sizeBytes = typeof data.data === 'string'
+        ? data.data.length
+        : JSON.stringify(data.data).length;
+
+      return {
+        exists: true,
+        updatedAt: data.updated_at,
+        sizeBytes
+      };
     } catch (e) {
-      console.error("Check Info Error:", e);
+      console.error('Check Info Error:', e);
       return { error: true, exists: false };
     }
   }

@@ -26,11 +26,7 @@ import { LoginScreen } from './components/LoginScreen.tsx';
 import { RequireAuth } from './components/RequireAuth.tsx';
 import { SystemView } from './types.ts';
 import { cloudService } from './services/cloudService.ts';
-import { supabase } from './services/supabaseClient';
-import { testConnection } from './lib/supabase';
 
-// Default Connection String (Auto-injected)
-const DEFAULT_NEON_CONN = 'postgresql://neondb_owner:npg_daR6gtonfr7V@ep-blue-butterfly-aebejil8-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require';
 
 const MainApp: React.FC = () => {
   const { currentUser } = useAuth();
@@ -38,57 +34,31 @@ const MainApp: React.FC = () => {
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
 
 
-  // --- Auto Sync Logic ---
+  // --- Auto Sync Logic (Supabase) ---
   useEffect(() => {
-    // 1. Ensure connection string exists
-    let conn = localStorage.getItem('jilco_neon_connection');
-    if (!conn) {
-        localStorage.setItem('jilco_neon_connection', DEFAULT_NEON_CONN);
-        conn = DEFAULT_NEON_CONN;
-    }
+    // تهيئة قاعدة البيانات
+    cloudService.initDb().catch(console.error);
 
-    // 2. Initial DB Init (Silent)
-    cloudService.initDb(conn).catch(console.error);
-
-    // 3. Background Sync Loop
+    // Background Sync Loop كل 30 ثانية
     const syncInterval = setInterval(async () => {
-        if (!currentUser) return; // Don't sync if not logged in
-        
-        try {
-            const currentData = cloudService.getLocalData();
-            // Simple check: In a real app, verify hash. Here we just upload periodically to ensure safety.
-            // Only upload if data exists
-            if (Object.keys(currentData).length > 0) {
-                setSyncStatus('syncing');
-                await cloudService.uploadData(conn!, currentData);
-                setSyncStatus('synced');
-                // Reset status after a few seconds
-                setTimeout(() => setSyncStatus('idle'), 2000);
-            }
-        } catch (e) {
-            console.error("Auto-sync failed:", e);
-            setSyncStatus('error');
+      if (!currentUser) return;
+
+      try {
+        const currentData = cloudService.getLocalData();
+        if (Object.keys(currentData).length > 0) {
+          setSyncStatus('syncing');
+          await cloudService.uploadData(currentData);
+          setSyncStatus('synced');
+          setTimeout(() => setSyncStatus('idle'), 2000);
         }
-    }, 30000); // Run every 30 seconds
+      } catch (e) {
+        console.error('Auto-sync failed:', e);
+        setSyncStatus('error');
+      }
+    }, 30000);
 
     return () => clearInterval(syncInterval);
   }, [currentUser]);
-
-  // Test Supabase connection
-  useEffect(() => {
-    // اختبار الاتصال بقاعدة Supabase
-    testConnection();
-
-    async function testSupabase() {
-      const { data, error } = await supabase.from('test_table').select('*').limit(1);
-      if (error) {
-        console.error('Supabase connection error:', error.message);
-      } else {
-        console.log('Supabase connection success:', data);
-      }
-    }
-    testSupabase();
-  }, []);
 
 
   return (
